@@ -1,0 +1,198 @@
+---
+title: "Reexamine the outcome of the 2019 Canadian General election: Conservative Party of Canada would have won the election with a full voter turnout"
+author: "Boyu Sheng"
+date: "December 9th, 2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(knitr)
+library(labelled)
+library(lme4)
+library(modelsummary)
+library(gtsummary)
+library(kableExtra)
+
+survey_data <- read_csv("C:\Program Files\304")
+census_data <- read_csv("C:\Program Files\304")
+```
+
+# Abstract
+On October 21st 2019, the result of the 43th Canadian General Election came out with the victory of Liberal Party and Justin Trudeau, the leader of the Liberal Party has been reelected as the Prime Minister. However, the Liberal Party only formed a minority government as they only led the Conservative Party by 36 seats in the Parliament and the seats Liberal Party obtained in the election did not achieve 50% of the total seats. With the relatively low voter turnout in the election of 67%, there was a potential for the Conservatives to overturn the result of this election. Hence in the research, I use the Multilevel Regression with Post-stratification Model (MRP) to simulate the outcome of the 2019 election with a full voter turnout as have drawn the conclusion that the Conservative Party would win the election if they encourage more eligible voters to vote. Such findings re-analyse the outcome of the 2019 election and give possible strategies to the Federal parities on their next election so that it will affect the method of canvass in the future. 
+
+# Keywords
+Simulate; Full voter turnout; 2019 Election; Liberal; Conservative; Multilevel Regression with Post-stratification
+
+# Introduction
+Canadian General Election is an election that elects the Member of Parliament(MP) in which each eligible voter votes for their preferred candidate in the riding that they belong to. Unlike other democratic systems in the world, Canada adopted the Westminster System that is unlike the United States. Voters in Canada do not vote for the Prime Minister, instead they vote for the MP and the MPs from the winning party will decide who is going to be the Prime Minister.\
+ 
+In the 2019 election, Liberal Party won the majority of seats in the Parliament but only formed a minority government and the difference between the Liberals and the second largest party---- Conservative Party is very slim. As a left wing party, Liberals gain most of their support from the city, elites with high incomes, racial minorities etc. While the Conservatives acquire most of their votes from the countryside, middle class and mainly white people according to the Canada General Social Survey. However, most of the election analysis or predictions have only focused on the data of the registered voters but neglected the eligible voters who did not vote in the election. In the 2019 election, Conservative Party has won 1.2% more popular vote than the Liberals but still lost the election to the Liberals with a total voter turnout of 67%. As the difference between those two parties are getting closer, and the world’s general attitude towards politics is getting more acute and people with different ideologies are getting more hardly to recognize each other based on the example of the 2020 United States Presidential Election in which both Donald Trump and Joe Biden have received historical highest popular votes in the election. It is not hard to see that it is absolutely possible for Canadian Federal parties to motivate more citizens to vote in the next election and the power of those potential voters is big enough to overturn the small difference between two parties. Hence, the key point of my research is mainly focusing on the people who did not vote which constitute 33% of the total population.\
+ 
+In the research, R Core Team is used to create model codes and Data cleaning. I have used the data from Canadian Election Study (CES) and Canadian General Social Survey(GSS) which includes region, income level, racial status, gender and voting status from the survey by using the MRP model. And I will be mainly using the data from the voters who checked “not to vote” in the survey. Based on the information that those respondents have provided, it can be concluded that eligible voters who did not vote match more characteristics of Conservative voters hence after the analysis, we can draw the conclusion that if the Conservative Party could have motivated more voters to vote, it is possible for them to overturn the result.\
+ 
+Although the research can reflect certain characters of passive voters, we will still encounter bias and systematic errors. As the surveys have limited resources of the sentiment of voters who chose not to vote. Some people may be totally careless about the result of the election, and others may have a strong determination of not voting. Weaknesses will be further discussed in the following discussion session. \
+ 
+In conclusion, this research is using the data from the 2019 election and the purpose of this research is to analyse the eligible voters who did not vote in order to give the parties more instruction to modify their strategies. There may be some systematic errors that make the result harder to predict. But I do hope this model can better reflect the potential voting behaviour and indirectly predict the next election with higher voter turnout. 
+
+
+# Data
+
+In the research, individual data were collected from the Canada Election Survey (CES) and 2016 Canadian General Social Survey (GSS). 
+
+```{r  table 1, echo=FALSE}
+survey_data %>%
+  select(gender, province, education, income_family) %>%
+  tbl_summary() %>%
+  as_kable(caption = "Survey data summary") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+\
+
+# Model
+
+These are the models built for analysis, where model 1 is better for predicting libreal party approval rating, because the AIC of model 1 is smaller than model2. 
+
+```{r,  echo=FALSE, message=FALSE}
+
+model <- glmer(cps19_LP ~ gender +  (1 + gender |province) +(1|education) + income_family ,
+                     data = survey_data, 
+                     family=binomial) 
+```
+
+```{r, echo=FALSE,warning=FALSE, message=FALSE}
+model2 <- glmer(cps19_LP ~ (1|gender) +  (1|province) + (1|education) + (1|gender:education) + income_family,
+                     data = survey_data, 
+                     family=binomial)
+```
+
+```{r, table2, echo=FALSE, message=FALSE}
+aic <- matrix(c(AIC(model),AIC(model2)),ncol=2,byrow=TRUE)
+colnames(aic) <- c("model 1","model 2")
+rownames(aic) <- c("AIC")
+kable(aic, caption = "AIC comparison") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+
+
+```{r,table3, echo=FALSE, message=FALSE}
+tbl_regression(model) %>%
+  as_kable(caption = "Model 1 summary")  %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+Model 3 is another model for predicting conservative party approval rating.\
+
+```{r, table4,  echo=FALSE, message=FALSE}
+model3 <- glmer(cps19_CP ~ (1|gender) +  (1|province) + (1|education) + income_family ,
+                     data = survey_data, 
+                     family=binomial)
+tbl_regression(model3) %>%
+  as_kable(caption = "Model 3 summary") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+
+\
+
+
+```{r, echo = FALSE}
+# Here I will perform the post-stratification calculation
+census_data$logodds_estimate1 <-
+  model %>%
+  predict(newdata = census_data)
+
+census_data$estimate1 <-
+  exp(census_data$logodds_estimate1)/(1+exp(census_data$logodds_estimate1))
+
+census_data$logodds_estimate2 <-
+  model3 %>%
+  predict(newdata = census_data)
+
+census_data$estimate2 <-
+  exp(census_data$logodds_estimate2)/(1+exp(census_data$logodds_estimate2))
+```
+
+
+
+
+
+\
+
+
+# Results
+
+These are the results. \
+```{r, table 5, echo=FALSE}
+census_data %>%
+  mutate(alp_predict_prop1 = estimate1*n) %>%
+  mutate(alp_predict_prop2 = estimate2*n) %>%
+  group_by(province) %>%
+summarise(alp_predict_Liberal_Party = sum(alp_predict_prop1)/sum(n), alp_predict_Conservative_Party=sum(alp_predict_prop2 )/sum(n), Vote_choice =  ifelse(alp_predict_Liberal_Party > alp_predict_Conservative_Party , "Liberal Party", "Conservative Party"),.groups = 'drop')  -> table3
+kable(table3, caption = "Vote choice among each province", col.names = c("Province", "Approve liberal party(%)", "Approve conservative party(%)", "Winner Party")) %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+
+```{r, table 6, echo = FALSE}
+census_data %>%
+  mutate(alp_predict_prop1 = estimate1*n) %>%
+  mutate(alp_predict_prop2 = estimate2*n) %>%
+  summarise(alp_predict_Liberal_Party	= sum(alp_predict_prop1)/sum(n), alp_predict_Conservative_Party	= sum(alp_predict_prop2)/sum(n), .groups = "drop")  -> table4
+kable(table4, caption="Final approval rate among two parties", col.names = c("Liberal party approval rating", "Conservative party approval rating"))  %>%
+  kable_styling(latex_options = "HOLD_position")
+
+```
+
+
+
+# Discussion 
+In the research, I have found out that the winning rate of the Conservative Party is 29.8% while the Liberal Party is 24.7% and the difference between them is around 5.1% which implies that if all the eligible voters actually are motivated to vote, the winning chance for Conservative Party is going to be higher. And this result can be analyzed in three aspects.
+ 
+## Implication
+The current electoral system that Canada is using is Westminster System in which citizens can only directly vote for the Member of Parliament(MP) in their belonging riding(there are 338 of them) and the elected MPs from the party which wins the most seats are going to decide who will become the Prime Minister. One of the biggest characteristics of the system is “ First-Past-The-Post” (FPTP) which implies that a party does not need to win more than 50% of the total votes but to win more popular votes than other parties within a riding. Hence, under this rule a party actually does not wish to win in each riding overwhelmingly as it will lower the popular vote in other places so that winning one riding by a very slim margin than other parties in each riding is the ideal result for all the participating parties. \
+ 
+In the past election, the supporters of Liberal Party were mostly concentrated in Maritime provinces ( New Brunswick, Newfoundland and Labrador, Nova Scotia and PEI) while the supporters of the Conservatives were located in Prairies Provinces( Alberta, Saskatchewan and Manitoba). Hence the battlefields are British Columbia, Ontario and Quebec and the outcome of those provinces can determine the result of the General Election. Within those provinces, Conservative voters usually live in suburban and rural areas while Liberal voters are concentrated in urban areas. While the majority of the population are located in urban areas so that when more potential voters are motivated, the popular vote advantage in each urban riding which dominated by Liberal Party will increase but make no difference in total seats change as I just discussed that parties only want to win a slim margin than others as the excess vote will be totally useless. On the contrary, as there are less people in rural areas, Conservatives can easily overturn the results of the ridings which are taken by the Liberals as Conservatives have advantages in those rural areas. \
+ 
+Moreover, the effect of other parties still played an important role. Although the possible winners of the general election are Liberals and Conservatives, there are still other parties like New Democratic Party (NDP), Green Party, Bloc Quebecois and People’s Party. Those parties are able to share the vote from the two dominant parties. Based on the ideology of each party, NDP and Green party which are left-wing parties are the 3rd and 4th largest parties respectively in Canada and they share the similar ideology as Liberal Party. So that the votes from the voters who consider themselves as “left” are actually split into 3 parts. There are only two national right-wing parties---- Conservative Party and People’s Party, but the effect of People’ Party can be neglected as it only attracted 1% of the popular vote with 0 seat in the parliament in the 2019 election. Hence the right wing voters only have one party to vote. So that when more voters are motivated, the increasing speed of the popular vote of Conservatives will be higher than the Liberals. \
+ 
+## Weaknesses and Next Step:
+Although I have tried to lower the error as much as possible, there are still some systematic errors and weaknesses that cannot be avoided. \
+1. The sample size is relatively small. Combined with the census data and survey data from GSS and CES, the sample size remained roughly 20000 and it certainly will have bias compared to the total population of over 37 millions in Canada. The ability of representing Canadian population is limited. More surveys can be delivered in order to solve this problem and next time the survey company should spend more money on distributing more surveys across Canada. \
+2. The methodology of these surveys is simple and limited. Surveys only have been delivered through phones or websites. It is less accurate when calculating the people who have no access to the internet or phone. Moreover, as more of the potential respondents who do not have access to internet or phone are typically seniors and the seniors are more likely to vote for Conservatives so that the actual result of Conservatives winning the election will be higher based on the survey. So the next step to counter this problem is that the survey company should distribute more money on mail-in surveys or face-to-face surveys in order to increase the accuracy. \
+3. The survey does not have the option of how likely someone will vote in the survey, as we are analyzing the people who did not vote in the last election, so that there must be a group of people who are not going to vote in any case. In another word, no matter how much incentives the parties give them to motivate them, there is always going to be a group of people who determine not to vote, the real voting turnout will never reach 100% but the option of the likelihood of someone will vote can help us determine the voter turnout more precisely. So the next step for survey companies should be adding a question of likelihood of voting in the survey. \
+
+
+# Reference
+1. GSS. (2017). General Social Survey – Family (GSS). Retrieved from https://www.statcan.gc.ca/eng/survey/household/4501 \
+
+2. Wickham, Hadley, Mara Averick, Jennifer Bryan, Winston Chang, Lucy D’Agostino McGowan, Romain François, Garrett Grolemund, et al. 2019. “Welcome to the tidyverse.” Journal of Open Source Software 4 (43): 1686. https://doi.org/10.21105/joss.01686. \
+
+3. Hadley Wickham, Jim Hester and Romain Francois (2018). readr: Read Rectangular Text Data. R package version 1.3.1. https://CRAN.R-project.org/package=readr \
+
+4. R Core Team (2020). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/. \
+
+5. Rohan Alexander and Sam Caetano (2020). "GSS_Cleaning" Retreived from https://q.utoronto.ca/courses/184062 \
+
+6. Rohan Alexander and Sam Caetano(2020), gss.csv \
+
+7. Yihui Xie (2020). knitr: A General-Purpose Package for Dynamic Report   Generation in R. R package version 1.30, https://yihui.org/knitr/  \
+
+8. Slowikowski, Kamil. 2020. Ggrepel: Automatically Position Non-Overlapping Text Labels with ’Ggplot2’. http://github.com/slowkow/ggrepel. \
+
+9. Tutorial: tbl_summary. (2020, September 13). GitHub. http://www.danieldsjoberg.com/gtsummary/articles/tbl_summary.html
+
+
+
+
+
